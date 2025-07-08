@@ -6,6 +6,9 @@ A Terraform module to manage **new and existing EBS volumes** for an EC2 instanc
 
 ## Architecture
 
+![image](https://github.com/user-attachments/assets/80d75a92-d0fe-4854-ad1b-4e748728eddb)
+
+
 > This module helps:
 > - Create and attach new EBS volumes to an EC2 instance
 > - Attach and mount existing EBS volumes
