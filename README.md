@@ -1,107 +1,112 @@
-# EBS
-[![Opstree Solutions][opstree_avatar]][opstree_homepage]<br/>[Opstree Solutions][opstree_homepage] 
+# Terraform AWS EBS Module
 
-  [opstree_homepage]: https://opstree.github.io/
-  [opstree_avatar]: https://img.cloudposse.com/150x150/https://github.com/opstree.png
+A Terraform module to manage **new and existing EBS volumes** for an EC2 instance. It automates the creation, attachment, and optional mounting of volumes using cloud-init-compatible user data.
 
-This terraform module will help users in:
-- Creating new EBS volumes and will attach and mount to the EC2 instance
-- Attach and mount already existing EBS volumes to EC2 instance
+---
 
-## Prerequisites
-- AWS access of root account/management account of control tower with admin privilege
-- Terraform
-- AWS CLI
+## Architecture
+
+> This module helps:
+> - Create and attach new EBS volumes to an EC2 instance
+> - Attach and mount existing EBS volumes
+> - Generate user data scripts to persist EBS mounts on reboot
+
+---
+
+
 
 ## Providers
-AWS
 
-## Note
-- Before using EBS module you have check [device name](https://github.com/awsdocs/amazon-ec2-user-guide/blob/master/doc_source/device_naming.md) for different instance type.
-- There is cloud init script in example directory user that script with your EC2 instance so that EBS volume will automatically mounted on restart of the instance.
+| Name                                              | Version  |
+|---------------------------------------------------|----------|
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 5.82.2   |
+| <a name="terraform_module"></a> [Terraform](Terraform\module) | >= 1.12.1|
+---
 
-## Inputs
-| Name | Description | Type | Default | Required |
-|-------|----------|------|-----|-----|
-|subnet_id| In which subnet your EC2 instance is running or going to run| string | null | yes|
-| instance_id | You instance Id to which your instance is going to attach and mount | string | null |yes|
-| secondary_ebs_volumes | For creating new EBS volumes | list(object) | null | no|
-| secondary_existing_ebs_volumes | For already existing EBS volumes | list(object) | null | no|
-
-## Outputs
-| Name | Description |
-|------|-------------|
-|new_ebs_user_data| User data for new EBS volumes to EC2 instance|
-|existing_ebs_user_data |  User data for aleady existing EBS volumes to EC2 instance|
-| vol_id | Volume id for newly created EBS volume|
+## Usage
 
 ```hcl
-module "ebs" {
-  source                         = "../modules/ebs"
-  subnet_id                      = var.subnet_id
-  instance_id                    = "You instance id"
-  secondary_ebs_volumes          = var.secondary_ebs_volumes
-  secondary_existing_ebs_volumes = var.secondary_existing_ebs_volumes
-}
+module "ebs_volumes" {
+  source = "OT-CLOUD-KIT/terraform-aws-ebs"
 
-variable "subnet_id" {
-  type    = string
-  default = "subnet-12345"
-}
+  instance_id = "i-0a0836ff2478df80d"
+  subnet_id   = "subnet-08a2aa30dbc179a2b"
 
-variable "secondary_ebs_volumes" {
-  type = list(object({
-    device_name          = string
-    mount_point          = string
-    volume_size          = number
-    encrypted            = optional(bool, false)
-    kms_key_id           = optional(string)
-    final_snapshot       = optional(bool, false)
-    multi_attach_enabled = optional(bool, false)
-    outpost_arn          = optional(string)
-    type                 = optional(string, "gp2")
-    snapshot_id          = optional(string)
-    iops                 = optional(number)
-    throughput           = optional(number)
-    tags                 = optional(map(string))
-  }))
-  default = [{
-    device_name    = "/dev/xvdf"
-    mount_point    = "/data"
-    volume_size    = 100
-    encrypted      = true
-    final_snapshot = true
-    kms_key_id     = "kms-key-arn"
-    tags = {
-      "Name" = "EBS-Volume"
-    }
+  bu      = "ot"
+  program = "ot"
+  team    = "infra"
+  app     = "bp"
+  env     = "d"
+
+  secondary_ebs_volumes = [
+    {
+      device_name          = "/dev/xvdf"
+      mount_point          = "/mnt/data1"
+      volume_size          = 20
+      encrypted            = true
+      kms_key_id           = null
+      final_snapshot       = false
+      multi_attach_enabled = false
+      iops                 = null
+      throughput           = null
+      type                 = "gp3"
+      snapshot_id          = null
+      outpost_arn          = null
     }
   ]
-  description = "Variables for creating new EBS volumes"
+
+  secondary_existing_ebs_volumes = []
 }
 
-variable "secondary_existing_ebs_volumes" {
-  type = list(object({
-    device_name = string
-    mount_point = string
-    volume_id   = string
-  }))
-  default = [
-    {
-      device_name = "/dev/xvdj"
-      mount_point = "/volume1"
-      volume_id   = "vol-123456"
-    },
-    {
-      device_name = "/dev/xvdk"
-      mount_point = "/volume2"
-      volume_id   = "vol-56789"
-    }
-  ]
-  description = "Variables for already existing EBS volumes"
-}
 
 ```
 
-### Contributors
-[Ashutosh Yadav](https://github.com/ashutoshyadav66)
+## Resource
+
+| Name                                                                                                                              | Type        |
+| --------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| [aws\_ebs\_volume.new](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ebs_volume)                    | resource    |
+| [aws\_volume\_attachment.new](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/volume_attachment)      | resource    |
+| [aws\_volume\_attachment.existing](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/volume_attachment) | resource    |
+| [aws\_subnet.selected](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/subnet)                     | data source |
+| [template\_file.new\_ebs](https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/file)               | data source |
+| [template\_file.existing\_ebs](https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/file)          | data source |
+
+
+---
+## Input
+| Name                                                                                                                               | Description                                                | Type           | Default                      | Required |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------- | ---------------------------- | :------: |
+| <a name="input_instance_id"></a> [**instance\_id**](#input_instance_id)                                                            | EC2 instance ID to which EBS volumes will be attached      | `string`       | `"i-0a0836ff2478df80d"`      |     yes   |
+| <a name="input_subnet_id"></a> [**subnet\_id**](#input_subnet_id)                                                                  | Subnet ID used to determine the AZ for EBS volume creation | `string`       | `"subnet-08a2aa30dbc179a2b"` |     yes  |
+| <a name="input_secondary_ebs_volumes"></a> [**secondary\_ebs\_volumes**](#input_secondary_ebs_volumes)                             | List of new EBS volume configurations to create            | `list(object)` | See example                  |     No   |
+| <a name="input_secondary_existing_ebs_volumes"></a> [**secondary\_existing\_ebs\_volumes**](#input_secondary_existing_ebs_volumes) | List of existing EBS volumes to attach                     | `list(object)` | `[]`                         |     No   |
+| <a name="input_random_alphanumeric_len"></a> [**random\_alphanumeric\_len**](#input_random_alphanumeric_len)                       | Length of random string suffix for names                   | `number`       | `4`                          |     No   |
+| <a name="input_bu"></a> [**bu**](#input_bu)                                                                                        | Business unit identifier (max 6 characters)                | `string`       | `"ot"`                       |     yes    |
+| <a name="input_app"></a> [**app**](#input_app)                                                                                     | Application name (max 10 characters)                       | `string`       | `"bp"`                       |     Yes   |
+| <a name="input_env"></a> [**env**](#input_env)                                                                                     | Environment (`d`, `p`, `q`, `s`, `g`)                      | `string`       | `"d"`                        |     Yes   |
+| <a name="input_resource"></a> [**resource**](#input_resource)                                                                      | AWS resource name prefix                                   | `string`       | `"ebs"`                      |     No  |
+| <a name="input_tenant"></a> [**tenant**](#input_tenant)                                                                            | Tenant identifier (optional)                               | `string`       | `""`                         |     No  |
+| <a name="input_special"></a> [**special**](#input_special)                                                                         | Include special characters in generated names              | `bool`         | `false`                      |     No    |
+| <a name="input_upper"></a> [**upper**](#input_upper)                                                                               | Use uppercase letters in generated names                   | `bool`         | `false`                      |     No    |
+| <a name="input_number"></a> [**number**](#input_number)                                                                            | Include numbers in generated names                         | `bool`         | `true`                       |     Yes   |
+| <a name="input_gen_no_of_names"></a> [**gen\_no\_of\_names**](#input_gen_no_of_names)                                              | Number of names to generate                                | `number`       | `1`                          |     No    |
+| <a name="input_team"></a> [**team**](#input_team)                                                                                  | Team name or responsible contact                           | `string`       | `"infra"`                    |     /yes    |
+| <a name="input_program"></a> [**program**](#input_program)                                                                         | Program or project name                                    | `string`       | `"ot"`                       |     Yes    |
+
+
+
+##  Outputs
+
+| Name | Description |
+|------|-------------|
+| <a name="output_new_ebs_volume_ids"></a> [new\_ebs\_volume\_ids](#output_new_ebs_volume_ids) | IDs of newly created EBS volumes |
+| <a name="output_attached_existing_ebs_volume_ids"></a> [attached\_existing\_ebs\_volume\_ids](#output_attached_existing_ebs_volume_ids) | IDs of existing EBS volumes attached to the instance |
+| <a name="output_user_data_new_volumes"></a> [user\_data\_new\_volumes](#output_user_data_new_volumes) | Rendered user-data for newly created and mounted volumes |
+| <a name="output_user_data_existing_volumes"></a> [user\_data\_existing\_volumes](#output_user_data_existing_volumes) | Rendered user-data for already existing and attached volumes |
+
+
+## Contributors
+
+- [Piyush Upadhyay](https://github.com/piiiyuushh)
+- [Nikita Joshi](https://github.com/jnikita19)

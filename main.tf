@@ -1,5 +1,7 @@
+
+# Render template for new EBS volumes
 data "template_file" "new_ebs" {
-  count    = var.secondary_ebs_volumes != null ? length(var.secondary_ebs_volumes) : 0
+  count    = length(var.secondary_ebs_volumes)
   template = file("${path.module}/user-data.sh.tpl")
   vars = {
     device_name = var.secondary_ebs_volumes[count.index].device_name
@@ -7,8 +9,9 @@ data "template_file" "new_ebs" {
   }
 }
 
-data "template_file" "existing_ebs_volumes" {
-  count    = var.secondary_existing_ebs_volumes != null ? length(var.secondary_existing_ebs_volumes) : 0
+# Render template for existing EBS volumes
+data "template_file" "existing_ebs" {
+  count    = length(var.secondary_existing_ebs_volumes)
   template = file("${path.module}/user-data.sh.tpl")
   vars = {
     device_name = var.secondary_existing_ebs_volumes[count.index].device_name
@@ -16,14 +19,16 @@ data "template_file" "existing_ebs_volumes" {
   }
 }
 
-data "aws_subnet" "id" {
-  count = var.secondary_ebs_volumes != null ? 1 : 0
+# Get AZ from subnet
+data "aws_subnet" "selected" {
+  count = length(var.secondary_ebs_volumes) > 0 ? 1 : 0
   id    = var.subnet_id
 }
 
-resource "aws_ebs_volume" "additional" {
-  count                = var.secondary_ebs_volumes != null ? length(var.secondary_ebs_volumes) : 0
-  availability_zone    = data.aws_subnet.id[0].availability_zone
+# Create new EBS volumes with naming and common tags
+resource "aws_ebs_volume" "new" {
+  count                = length(var.secondary_ebs_volumes)
+  availability_zone    = data.aws_subnet.selected[0].availability_zone
   size                 = var.secondary_ebs_volumes[count.index].volume_size
   encrypted            = var.secondary_ebs_volumes[count.index].encrypted
   kms_key_id           = var.secondary_ebs_volumes[count.index].kms_key_id
@@ -34,19 +39,27 @@ resource "aws_ebs_volume" "additional" {
   type                 = var.secondary_ebs_volumes[count.index].type
   snapshot_id          = var.secondary_ebs_volumes[count.index].snapshot_id
   outpost_arn          = var.secondary_ebs_volumes[count.index].outpost_arn
-  tags                 = var.secondary_ebs_volumes[count.index].tags
 
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.base_name}-ebs-${count.index + 1}"
+    },
+    var.secondary_ebs_volumes[count.index].tags
+  )
 }
 
-resource "aws_volume_attachment" "ebs" {
-  count       = var.secondary_ebs_volumes != null ? length(var.secondary_ebs_volumes) : 0
+# Attach new volumes
+resource "aws_volume_attachment" "new" {
+  count       = length(var.secondary_ebs_volumes)
   device_name = var.secondary_ebs_volumes[count.index].device_name
-  volume_id   = aws_ebs_volume.additional[count.index].id
+  volume_id   = aws_ebs_volume.new[count.index].id
   instance_id = var.instance_id
 }
 
-resource "aws_volume_attachment" "existing_ebs_volumes" {
-  count       = var.secondary_existing_ebs_volumes != null ? length(var.secondary_existing_ebs_volumes) : 0
+# Attach existing volumes
+resource "aws_volume_attachment" "existing" {
+  count       = length(var.secondary_existing_ebs_volumes)
   device_name = var.secondary_existing_ebs_volumes[count.index].device_name
   volume_id   = var.secondary_existing_ebs_volumes[count.index].volume_id
   instance_id = var.instance_id
